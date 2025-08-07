@@ -8,7 +8,8 @@ import com.example.urlshortener.repository.UrlRepository;
 import com.example.urlshortener.service.UrlHashService;
 import com.example.urlshortener.service.UrlService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,12 +19,12 @@ import java.time.LocalDateTime;
 /**
  * Implementation of UrlService providing URL shortening functionality.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class UrlServiceImpl implements UrlService {
 
+    private static final Logger log = LoggerFactory.getLogger(UrlServiceImpl.class);
     private final UrlRepository urlRepository;
     private final UrlHashService urlHashService;
 

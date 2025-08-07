@@ -2,7 +2,8 @@ package com.example.urlshortener.example;
 
 import com.example.urlshortener.service.UrlHashService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,11 +12,11 @@ import org.springframework.stereotype.Component;
  * This example shows how to integrate the UrlHashService into your application
  * for generating short codes with proper error handling and validation.
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class UrlHashServiceUsageExample {
 
+    private static final Logger log = LoggerFactory.getLogger(UrlHashServiceUsageExample.class);
     private final UrlHashService urlHashService;
 
     /**

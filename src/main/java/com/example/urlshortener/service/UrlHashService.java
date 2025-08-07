@@ -2,7 +2,8 @@ package com.example.urlshortener.service;
 
 import com.example.urlshortener.repository.UrlRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -12,12 +13,12 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Service for generating short codes from long URLs using Base62-encoded MD5 hashing.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UrlHashService {
 
-    private final UrlRepository urlRepository; // Changed from UrlService to UrlRepository
+    private static final Logger log = LoggerFactory.getLogger(UrlHashService.class);
+    private final UrlRepository urlRepository;
 
     private static final String BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     private static final int SHORT_CODE_LENGTH = 6;
@@ -70,7 +71,7 @@ public class UrlHashService {
             throw new IllegalArgumentException("Code cannot be null or empty");
         }
 
-        boolean exists = urlRepository.existsByShortCode(code.trim()); // Direct repository call
+        boolean exists = urlRepository.existsByShortCode(code.trim());
         log.debug("Checking existence of code '{}': {}", code, exists);
         return exists;
     }

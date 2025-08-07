@@ -5,7 +5,8 @@ import com.example.urlshortener.dto.UrlResponse;
 import com.example.urlshortener.service.UrlService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,13 +16,13 @@ import java.net.URI;
 /**
  * REST Controller for URL shortening operations.
  */
-@Slf4j
 @RestController
 @RequestMapping("/urls")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class UrlController {
 
+    private static final Logger log = LoggerFactory.getLogger(UrlController.class);
     private final UrlService urlService;
 
     /**
