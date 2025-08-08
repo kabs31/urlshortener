@@ -154,6 +154,13 @@ stop_services() {
 cleanup() {
     print_status "Cleaning up..."
     docker-compose down -v --remove-orphans
+
+    # Remove any corrupted data directories
+    if [ -d "data" ]; then
+        print_status "Removing corrupted data directories..."
+        rm -rf data/
+    fi
+
     docker system prune -f
     print_success "Cleanup completed"
 }
