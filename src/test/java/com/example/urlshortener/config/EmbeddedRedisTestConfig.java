@@ -10,13 +10,15 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import redis.embedded.RedisServer;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 
 /**
  * Test configuration for embedded Redis server.
  * This allows running tests without requiring an external Redis instance.
+ *
+ * NOTE: This file should be placed in src/test/java, not src/main/java
  */
 @TestConfiguration
 @Profile("test")

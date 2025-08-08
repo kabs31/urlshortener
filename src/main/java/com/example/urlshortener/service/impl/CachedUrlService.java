@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -129,7 +130,7 @@ public class CachedUrlService implements UrlService {
         // Check cache first, then database
         String cacheKey = URL_CACHE_PREFIX + shortCode;
 
-        if (stringRedisTemplate.hasKey(cacheKey)) {
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(cacheKey))) {
             return true;
         }
 
@@ -193,9 +194,15 @@ public class CachedUrlService implements UrlService {
      */
     public CacheStats getCacheStats() {
         try {
-            // Get some basic Redis info
-            Long totalKeys = stringRedisTemplate.execute(connection -> {
-                return connection.dbSize();
+            // Fixed: Use explicit RedisCallback to avoid ambiguous method reference
+            Long totalKeys = stringRedisTemplate.execute((RedisCallback<Long>) connection -> {
+                try {
+                    // Use keyspace info instead of deprecated dbSize()
+                    return connection.commands().dbSize();
+                } catch (Exception e) {
+                    log.warn("Could not get database size, returning 0: {}", e.getMessage());
+                    return 0L;
+                }
             });
 
             return CacheStats.builder()
