@@ -1,5 +1,6 @@
 package com.example.urlshortener.exception;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -137,12 +138,25 @@ public class GlobalExceptionHandler {
     @lombok.Builder
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
+    @Schema(description = "Standard error response format")
     public static class ErrorResponse {
+
+        @Schema(description = "Timestamp when the error occurred", example = "2025-08-08T14:30:00")
         private LocalDateTime timestamp;
+
+        @Schema(description = "HTTP status code", example = "404")
         private int status;
+
+        @Schema(description = "Error type", example = "Not Found")
         private String error;
+
+        @Schema(description = "Error message", example = "Short code not found: abc123")
         private String message;
+
+        @Schema(description = "Request path that caused the error", example = "/abc123")
         private String path;
+
+        @Schema(description = "Field validation errors (if applicable)")
         private Map<String, String> validationErrors;
     }
 }
