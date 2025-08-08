@@ -1,0 +1,137 @@
+# Docker profile configuration for URL Shortener
+# Place this file in src/main/resources/
+
+spring:
+  application:
+    name: url-shortener
+
+  # Database Configuration for Docker
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/urlshortener}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  # Redis Configuration for Docker
+  redis:
+    host: ${SPRING_REDIS_HOST:redis}
+    port: ${SPRING_REDIS_PORT:6379}
+    database: ${SPRING_REDIS_DATABASE:0}
+    password: ${SPRING_REDIS_PASSWORD:}
+    timeout: 5000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
+
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: ${APP_CACHE_URL_TTL:3600}s
+      cache-null-values: false
+      key-prefix: urlshortener:
+      use-key-prefix: true
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        generate_statistics: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    defer-datasource-initialization: false
+
+  # Flyway Configuration
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    clean-disabled: true
+    baseline-version: 0
+    baseline-description: Initial baseline
+
+  # SQL Initialization (disabled in favor of Flyway)
+  sql:
+    init:
+      mode: never
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
+    connection-timeout: 20000
+    accept-count: 100
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
+
+# Application Configuration
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080/api/v1}
+  cache:
+    url:
+      ttl: ${APP_CACHE_URL_TTL:3600}
+
+# Logging Configuration
+logging:
+  level:
+    com.example.urlshortener: ${LOGGING_LEVEL_COM_EXAMPLE_URLSHORTENER:INFO}
+    org.hibernate.SQL: WARN
+    org.flywaydb: INFO
+    org.springframework.cache: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CACHE:INFO}
+    org.springframework.data.redis: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /app/logs/url-shortener.log
+    max-size: 100MB
+    max-history: 30
+
+# Management Endpoints (for monitoring)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,flyway,caches
+      base-path: /management
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    caches:
+      enabled: true
+    metrics:
+      enabled: true
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true

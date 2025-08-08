@@ -3,49 +3,110 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:13-alpine
     container_name: urlshortener-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: urlshortener
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     networks:
       - urlshortener-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U postgres -d urlshortener"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: urlshortener-redis
+    restart: unless-stopped
+    command: redis-server /etc/redis/redis.conf
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-      - ./redis.conf:/etc/redis/redis.conf
-    command: redis-server /etc/redis/redis.conf
+      - ./redis.conf:/etc/redis/redis.conf:ro
     networks:
       - urlshortener-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    sysctls:
+      net.core.somaxconn: 1024
+
+  # URL Shortener Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: urlshortener-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Spring profiles
+      SPRING_PROFILES_ACTIVE: docker
+
+      # Database configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/urlshortener
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password
+
+      # Redis configuration
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_DATABASE: 0
+
+      # Application configuration
+      APP_BASE_URL: http://localhost:8080/api/v1
+      APP_CACHE_URL_TTL: 3600
+
+      # JVM configuration
+      JAVA_OPTS: -Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+
+      # Logging
+      LOGGING_LEVEL_COM_EXAMPLE_URLSHORTENER: INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CACHE: DEBUG
+
+      # Timezone
+      TZ: UTC
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - urlshortener-network
+    healthcheck:
+      test: ["CMD", "/app/healthcheck.sh"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
   # Redis Commander (Optional - Web UI for Redis)
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: redis-commander
+    restart: unless-stopped
     environment:
       - REDIS_HOSTS=local:redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
     ports:
       - "8081:8081"
     networks:
@@ -59,9 +120,11 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: urlshortener-pgadmin
+    restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: admin@urlshortener.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "8082:80"
     volumes:
@@ -73,24 +136,47 @@ services:
     profiles:
       - tools
 
+  # Nginx (Optional - Reverse proxy and load balancer)
+  nginx:
+    image: nginx:alpine
+    container_name: urlshortener-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - urlshortener-network
+    depends_on:
+      - app
+    profiles:
+      - nginx
+
+# Named volumes for data persistence
 volumes:
   postgres_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+
   redis_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/redis
+
   pgadmin_data:
     driver: local
 
+# Custom network for service communication
 networks:
   urlshortener-network:
     driver: bridge
-
-# Example usage:
-# Start only core services (PostgreSQL + Redis):
-#   docker-compose up -d
-#
-# Start with management tools:
-#   docker-compose --profile tools up -d
-#
-# Scale Redis for high availability (if using Redis Cluster):
-#   docker-compose up -d --scale redis=3
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
