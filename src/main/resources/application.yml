@@ -14,16 +14,38 @@ spring:
       minimum-idle: 5
       idle-timeout: 300000
 
+  # Redis Configuration
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    password: # Leave empty if no password
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
+      shutdown-timeout: 100ms
+
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600s # 1 hour
+      cache-null-values: false
+
   # JPA Configuration
   jpa:
     hibernate:
-      ddl-auto: validate  # Changed from 'update' to 'validate' for Flyway
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-    defer-datasource-initialization: false  # Let Flyway handle schema creation
+    defer-datasource-initialization: false
 
   # Flyway Configuration
   flyway:
@@ -31,14 +53,14 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: true
-    clean-disabled: true  # Prevent accidental data loss
+    clean-disabled: true
     baseline-version: 0
     baseline-description: Initial baseline
 
   # SQL Initialization (disabled in favor of Flyway)
   sql:
     init:
-      mode: never  # Disabled - using Flyway instead
+      mode: never
 
 # Server Configuration
 server:
@@ -49,20 +71,90 @@ server:
 # Application Configuration
 app:
   base-url: http://localhost:8080/api/v1
+  cache:
+    url:
+      ttl: 3600 # Cache TTL in seconds (1 hour)
 
 # Logging Configuration
 logging:
   level:
-    com.example.urlshortener: DEBUG
-    org.hibernate.SQL: DEBUG
+    com.example.urlshortener: INFO
+    org.hibernate.SQL: WARN
     org.flywaydb: INFO
+    org.springframework.cache: DEBUG
+    org.springframework.data.redis: DEBUG
 
 # Management Endpoints (for monitoring)
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,flyway
+        include: health,info,flyway,caches
   endpoint:
     health:
       show-details: when_authorized
+    caches:
+      enabled: true
+
+---
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  # Development Redis (can be different instance)
+  redis:
+    host: localhost
+    port: 6379
+    database: 1 # Different database for dev
+
+  # More verbose logging in development
+  logging:
+    level:
+      com.example.urlshortener: DEBUG
+      org.springframework.cache: DEBUG
+
+app:
+  cache:
+    url:
+      ttl: 1800 # Shorter TTL in dev (30 minutes)
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  # Production Redis Configuration
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    database: ${REDIS_DATABASE:0}
+    password: ${REDIS_PASSWORD:}
+    ssl: ${REDIS_SSL:false}
+    timeout: 5000ms
+    lettuce:
+      pool:
+        max-active: 20
+        max-idle: 10
+        min-idle: 5
+        max-wait: 3000ms
+
+  # Production cache settings
+  cache:
+    redis:
+      time-to-live: 7200s # 2 hours in production
+
+  # Production logging
+  logging:
+    level:
+      com.example.urlshortener: INFO
+      org.springframework.cache: WARN
+      org.springframework.data.redis: WARN
+
+app:
+  cache:
+    url:
+      ttl: 7200 # Longer TTL in production (2 hours)

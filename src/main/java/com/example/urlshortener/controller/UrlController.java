@@ -2,8 +2,10 @@ package com.example.urlshortener.controller;
 
 import com.example.urlshortener.dto.ShortenRequest;
 import com.example.urlshortener.dto.ShortenResponse;
+import com.example.urlshortener.dto.UrlRequest;
 import com.example.urlshortener.dto.UrlResponse;
 import com.example.urlshortener.service.UrlService;
+import com.example.urlshortener.service.impl.CachedUrlService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -22,28 +24,29 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 
 /**
- * REST Controller for URL shortening operations.
+ * REST Controller for URL shortening operations with Redis caching.
  */
 @RestController
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@Tag(name = "URL Shortener", description = "API for shortening URLs and redirecting to original URLs")
+@Tag(name = "URL Shortener", description = "API for shortening URLs and redirecting to original URLs with Redis caching")
 public class UrlController {
 
     private static final Logger log = LoggerFactory.getLogger(UrlController.class);
     private final UrlService urlService;
+    private final CachedUrlService cachedUrlService;
 
     /**
      * Shorten a long URL.
      */
     @Operation(
             summary = "Shorten a URL",
-            description = "Creates a shortened version of the provided URL and returns a short code"
+            description = "Creates a shortened version of the provided URL and caches it in Redis"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "201",
-                    description = "URL successfully shortened",
+                    description = "URL successfully shortened and cached",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ShortenResponse.class)
@@ -70,10 +73,10 @@ public class UrlController {
 
         try {
             // Convert to internal DTO format
-            com.example.urlshortener.dto.UrlRequest urlRequest =
-                    new com.example.urlshortener.dto.UrlRequest(request.getUrl(), null);
+            UrlRequest urlRequest = new UrlRequest(request.getUrl(), null);
 
-            UrlResponse response = urlService.shortenUrl(urlRequest);
+            // Use cached service for shortening (will automatically cache result)
+            UrlResponse response = cachedUrlService.shortenUrl(urlRequest);
 
             // Convert to API response format
             ShortenResponse shortenResponse = ShortenResponse.builder()
@@ -84,7 +87,7 @@ public class UrlController {
                     .expiresAt(response.getExpiresAt())
                     .build();
 
-            log.info("Successfully created short URL: {}", response.getShortCode());
+            log.info("Successfully created and cached short URL: {}", response.getShortCode());
 
             return ResponseEntity
                     .status(HttpStatus.CREATED)
@@ -97,16 +100,17 @@ public class UrlController {
     }
 
     /**
-     * Redirect to original URL using short code.
+     * Redirect to original URL using short code with Redis caching.
+     * This is the main redirect endpoint optimized for performance.
      */
     @Operation(
-            summary = "Redirect to original URL",
-            description = "Redirects to the original URL associated with the provided short code"
+            summary = "Redirect to original URL (Cached)",
+            description = "Redirects to the original URL with Redis cache lookup first, then DB fallback"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "302",
-                    description = "Successfully redirected to original URL",
+                    description = "Successfully redirected to original URL (cache hit or miss)",
                     content = @Content()
             ),
             @ApiResponse(
@@ -135,15 +139,21 @@ public class UrlController {
             )
             String code
     ) {
-        log.info("Redirecting short code: {}", code);
+        log.info("Redirecting short code with cache lookup: {}", code);
 
         try {
-            UrlResponse response = urlService.getOriginalUrl(code);
-            log.info("Redirecting to: {}", response.getLongUrl());
+            // Use optimized cached redirect method
+            // This will:
+            // 1. Check Redis cache first (key: url:{code})
+            // 2. If cache miss, query DB and cache result
+            // 3. Increment click count asynchronously
+            String longUrl = cachedUrlService.getOriginalUrlForRedirect(code);
+
+            log.info("Redirecting {} to: {} (cached lookup)", code, longUrl);
 
             return ResponseEntity
                     .status(HttpStatus.FOUND)
-                    .location(URI.create(response.getLongUrl()))
+                    .location(URI.create(longUrl))
                     .build();
 
         } catch (Exception e) {
@@ -156,28 +166,51 @@ public class UrlController {
      * Health check endpoint.
      */
     @Operation(
-            summary = "Health check",
-            description = "Returns the health status of the URL shortener service"
+            summary = "Health check with cache status",
+            description = "Returns the health status of the URL shortener service and Redis cache"
     )
     @ApiResponse(
             responseCode = "200",
             description = "Service is healthy",
             content = @Content(
-                    mediaType = "text/plain",
-                    schema = @Schema(type = "string", example = "URL Shortener Service is running!")
+                    mediaType = "application/json"
             )
     )
     @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("URL Shortener Service is running!");
+    public ResponseEntity<HealthResponse> health() {
+        try {
+            CachedUrlService.CacheStats cacheStats = cachedUrlService.getCacheStats();
+
+            HealthResponse health = HealthResponse.builder()
+                    .status("UP")
+                    .message("URL Shortener Service is running!")
+                    .cacheEnabled(cacheStats.isCacheEnabled())
+                    .totalCachedUrls(cacheStats.getTotalCachedUrls())
+                    .cacheTtlSeconds(cacheStats.getTtlSeconds())
+                    .build();
+
+            return ResponseEntity.ok(health);
+        } catch (Exception e) {
+            log.error("Health check failed: {}", e.getMessage());
+
+            HealthResponse health = HealthResponse.builder()
+                    .status("DOWN")
+                    .message("Service error: " + e.getMessage())
+                    .cacheEnabled(false)
+                    .totalCachedUrls(0L)
+                    .cacheTtlSeconds(0L)
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(health);
+        }
     }
 
     /**
-     * Get URL details by short code (for debugging/analytics).
+     * Get URL details by short code with caching.
      */
     @Operation(
-            summary = "Get URL details",
-            description = "Retrieves detailed information about a shortened URL without redirecting"
+            summary = "Get URL details (Cached)",
+            description = "Retrieves detailed information about a shortened URL using cache when possible"
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -204,10 +237,11 @@ public class UrlController {
             )
             String code
     ) {
-        log.info("Retrieving details for short code: {}", code);
+        log.info("Retrieving cached details for short code: {}", code);
 
         try {
-            UrlResponse response = urlService.getOriginalUrl(code);
+            // Use the cached service method (will hit cache or DB)
+            UrlResponse response = cachedUrlService.getOriginalUrl(code);
 
             ShortenResponse details = ShortenResponse.builder()
                     .code(response.getShortCode())
@@ -217,12 +251,71 @@ public class UrlController {
                     .expiresAt(response.getExpiresAt())
                     .build();
 
-            log.info("Successfully retrieved details for: {}", code);
+            log.info("Successfully retrieved cached details for: {}", code);
             return ResponseEntity.ok(details);
 
         } catch (Exception e) {
             log.error("Error retrieving details for short code: {}", code, e);
             throw e;
         }
+    }
+
+    /**
+     * Cache management endpoint - invalidate specific short code.
+     */
+    @Operation(
+            summary = "Invalidate cache for short code",
+            description = "Removes a specific short code from Redis cache"
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Cache invalidated successfully",
+            content = @Content(mediaType = "text/plain")
+    )
+    @DeleteMapping("/api/cache/{code}")
+    public ResponseEntity<String> invalidateCache(
+            @PathVariable
+            @Parameter(
+                    description = "The short code to remove from cache",
+                    example = "abc123",
+                    required = true
+            )
+            String code
+    ) {
+        log.info("Invalidating cache for short code: {}", code);
+
+        try {
+            cachedUrlService.invalidateCache(code);
+            return ResponseEntity.ok("Cache invalidated for: " + code);
+        } catch (Exception e) {
+            log.error("Error invalidating cache for: {}", code, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to invalidate cache: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Health response DTO.
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    @Schema(description = "Health check response with cache information")
+    public static class HealthResponse {
+        @Schema(description = "Service status", example = "UP")
+        private String status;
+
+        @Schema(description = "Status message", example = "URL Shortener Service is running!")
+        private String message;
+
+        @Schema(description = "Whether Redis cache is enabled", example = "true")
+        private boolean cacheEnabled;
+
+        @Schema(description = "Total number of cached URLs", example = "1250")
+        private Long totalCachedUrls;
+
+        @Schema(description = "Cache TTL in seconds", example = "3600")
+        private Long cacheTtlSeconds;
     }
 }
