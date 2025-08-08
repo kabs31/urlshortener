@@ -15,8 +15,8 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "url_mapping", indexes = {
-        @Index(name = "idx_short_code", columnList = "short_code", unique = true),
-        @Index(name = "idx_created_at", columnList = "created_at")
+        @Index(name = "idx_url_mapping_short_code", columnList = "short_code", unique = true),
+        @Index(name = "idx_url_mapping_created_at", columnList = "created_at")
 })
 @Data
 @Builder
