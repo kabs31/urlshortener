@@ -45,6 +45,12 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Flyway Core for Database Migrations -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+
 		<!-- Lombok - Updated version for Java 17 compatibility -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -71,6 +77,12 @@
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
 			<scope>test</scope>
+		</dependency>
+
+		<!-- Spring Boot Actuator for monitoring -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 	</dependencies>
 
@@ -115,6 +127,31 @@
 				</configuration>
 			</plugin>
 
+			<!-- Flyway Maven Plugin for Database Migrations -->
+			<plugin>
+				<groupId>org.flywaydb</groupId>
+				<artifactId>flyway-maven-plugin</artifactId>
+				<version>9.22.3</version>
+				<configuration>
+					<url>jdbc:postgresql://localhost:5432/urlshortener</url>
+					<user>postgres</user>
+					<password>password</password>
+					<locations>
+						<location>classpath:db/migration</location>
+					</locations>
+					<baselineOnMigrate>true</baselineOnMigrate>
+					<validateOnMigrate>true</validateOnMigrate>
+					<cleanDisabled>true</cleanDisabled>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>org.postgresql</groupId>
+						<artifactId>postgresql</artifactId>
+						<version>42.6.0</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+
 			<!-- Maven Surefire Plugin for running tests -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -123,4 +160,20 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<!-- Profiles for different environments -->
+	<profiles>
+		<profile>
+			<id>dev</id>
+			<properties>
+				<spring.profiles.active>dev</spring.profiles.active>
+			</properties>
+		</profile>
+		<profile>
+			<id>prod</id>
+			<properties>
+				<spring.profiles.active>prod</spring.profiles.active>
+			</properties>
+		</profile>
+	</profiles>
 </project>
