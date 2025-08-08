@@ -38,7 +38,7 @@
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
 
-		<!-- Spring Boot Data Redis Starter -->
+		<!-- Spring Boot Data Redis Starter (includes lettuce-core automatically) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
@@ -48,12 +48,6 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-cache</artifactId>
-		</dependency>
-
-		<!-- Lettuce Redis Client (default with spring-boot-starter-data-redis) -->
-		<dependency>
-			<groupId>io.lettuce.lettuce-core</groupId>
-			<artifactId>lettuce-core</artifactId>
 		</dependency>
 
 		<!-- PostgreSQL Driver -->
@@ -116,7 +110,7 @@
 			<artifactId>jackson-datatype-jsr310</artifactId>
 		</dependency>
 
-		<!-- Embedded Redis for Testing (optional) -->
+		<!-- Embedded Redis for Testing -->
 		<dependency>
 			<groupId>it.ozimov</groupId>
 			<artifactId>embedded-redis</artifactId>
