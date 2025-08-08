@@ -40,7 +40,7 @@ spring:
     redis:
       time-to-live: ${APP_CACHE_URL_TTL:3600}s
       cache-null-values: false
-      key-prefix: urlshortener:
+      key-prefix: "urlshortener"  # ✅ Fixed: Removed trailing colon and added quotes
       use-key-prefix: true
 
   # JPA Configuration
