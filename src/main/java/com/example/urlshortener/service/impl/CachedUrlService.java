@@ -15,7 +15,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.RedisCallback;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate; // ✅ Use Spring Boot's auto-configured StringRedisTemplate
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ public class CachedUrlService implements UrlService {
 
     private final UrlRepository urlRepository;
     private final UrlHashService urlHashService;
-    private final RedisTemplate<String, String> stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate; // ✅ Changed to use Spring Boot's StringRedisTemplate
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
