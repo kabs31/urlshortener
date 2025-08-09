@@ -14,8 +14,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisCallback;
-import org.springframework.data.redis.core.StringRedisTemplate; // ✅ Use Spring Boot's auto-configured StringRedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,8 +25,10 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * URL Service implementation with Redis caching support.
+ * This is the primary implementation that should be used throughout the application.
  */
 @Service
+@Primary  // ✅ Added @Primary to resolve Spring dependency injection ambiguity
 @RequiredArgsConstructor
 @Transactional
 public class CachedUrlService implements UrlService {
@@ -36,7 +39,7 @@ public class CachedUrlService implements UrlService {
 
     private final UrlRepository urlRepository;
     private final UrlHashService urlHashService;
-    private final StringRedisTemplate stringRedisTemplate; // ✅ Changed to use Spring Boot's StringRedisTemplate
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
